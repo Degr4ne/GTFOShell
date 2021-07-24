@@ -1,0 +1,363 @@
+#!/bin/bash
+
+#Author: DeGr4ne
+
+#Colors
+
+greenColor="\e[0;32m\033[1m"
+endColor="\033[0m\e[0m"
+redColor="\e[0;31m\033[1m"
+blueColor="\e[0;34m\033[1m"
+yellowColor="\e[0;33m\033[1m"
+purpleColor="\e[0;35m\033[1m"
+turquoiseColor="\e[0;36m\033[1m"
+grayColor="\e[0;37m\033[1m"
+
+# trap ctrl-c and call ctrl_c()
+trap ctrl_c INT
+
+function ctrl_c(){
+
+	echo -e "\n${redColor}[!] Exiting...\n${endColor}"
+	tput cnorm
+       	rm bins.tmp; exit 1
+}
+
+function HelpPanel(){
+
+	echo -e "\n\n"
+	echo -e "${blueColor}  ██████╗ ████████╗███████╗ █████╗  ██████╗██╗  ██╗███████╗██╗     ██╗"     
+	echo -e "${blueColor} ██╔════╝ ╚══██╔══╝██╔════╝██╔══██╗██╔════╝██║  ██║██╔════╝██║     ██║"
+	echo -e "${blueColor} ██║  ██╗    ██║   █████╗  ██║  ██║╚█████╗ ███████║█████╗  ██║     ██║"
+	echo -e "${blueColor} ██║  ╚██╗   ██║   ██╔══╝  ██║  ██║ ╚═══██╗██╔══██║██╔══╝  ██║     ██║"
+	echo -e "${blueColor} ╚██████╔╝   ██║   ██║     ╚█████╔╝██████╔╝██║  ██║███████╗███████╗███████╗"
+	echo -e "${blueColor}  ╚═════╝    ╚═╝   ╚═╝      ╚════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝${endColor}"
+	
+	echo -e "\n${redColor}[!] Use: ./gtfoshell${endColor}"
+	echo -e "\n\n\t${grayColor}[-b]${endColor}${greenColor} Show the binary information.${endColor}"
+	echo -e "\t\t${turquoiseColor} Example: gtfoshell -b chown ${endColor}"
+	echo -e "\n\t${grayColor}[-f]${endColor}${greenColor} Specify the function of the binary.${endColor}"
+	echo -e "\t\t${turquoiseColor} Example: gtfoshell -b bash -f suid ${endColor}"
+	echo -e "\n\t${grayColor}[-a]${endColor}${greenColor} Listing Mode. (default: List all binaries)${endColor}"
+	echo -e "\t\t${yellowColor} binaries${endColor}${greenColor}:\tList all binaries${endColor}"
+	echo -e "\t\t${yellowColor} functions${endColor}${greenColor}:\tList all functions${endColor}"
+	echo -e "\t\t${turquoiseColor} Example: gtfoshell -a ${endColor}"
+	echo -e "\t\t\t${turquoiseColor}  gtfoshell -a binaries${endColor}"
+	echo -e "\t\t\t${turquoiseColor}  gtfoshell -a functions${endColor}"
+	echo -e "\n\t${grayColor}[-h]${endColor}${greenColor} Show this panel${endColor}"
+
+	tput cnorm; exit 1
+}
+
+# Create a table
+# Credits: https://github.com/gdbtek/linux-cookbooks/blob/master/libraries/util.bash
+#  ----------- . -----------
+function isEmptyString(){
+    local -r string="${1}"
+
+    if [[ "$(trimString "${string}")" = '' ]]
+    then
+        echo 'true' && return 0
+    fi
+
+    echo 'false' && return 1
+}
+
+function printTable(){
+    local -r delimiter="${1}"
+    local -r tableData="$(removeEmptyLines "${2}")"
+    local -r colorHeader="${3}"
+    local -r displayTotalCount="${4}"
+
+    if [[ "${delimiter}" != '' && "$(isEmptyString "${tableData}")" = 'false' ]]
+    then
+        local -r numberOfLines="$(trimString "$(wc -l <<< "${tableData}")")"
+
+        if [[ "${numberOfLines}" -gt '0' ]]
+        then
+            local table=''
+            local i=1
+
+            for ((i = 1; i <= "${numberOfLines}"; i = i + 1))
+            do
+                local line=''
+                line="$(sed "${i}q;d" <<< "${tableData}")"
+
+                local numberOfColumns=0
+                numberOfColumns="$(awk -F "${delimiter}" '{print NF}' <<< "${line}")"
+
+                # Add Line Delimiter
+
+                if [[ "${i}" -eq '1' ]]
+                then
+                    table="${table}$(printf '%s#+' "$(repeatString '#+' "${numberOfColumns}")")"
+                fi
+
+                # Add Header Or Body
+
+                table="${table}\n"
+
+                local j=1
+
+                for ((j = 1; j <= "${numberOfColumns}"; j = j + 1))
+                do
+                    table="${table}$(printf '#|  %s' "$(cut -d "${delimiter}" -f "${j}" <<< "${line}")")"
+                done
+
+                table="${table}#|\n"
+
+                # Add Line Delimiter
+
+                if [[ "${i}" -eq '1' ]] || [[ "${numberOfLines}" -gt '1' && "${i}" -eq "${numberOfLines}" ]]
+                then
+                    table="${table}$(printf '%s#+' "$(repeatString '#+' "${numberOfColumns}")")"
+                fi
+            done
+
+            if [[ "$(isEmptyString "${table}")" = 'false' ]]
+            then
+                local output=''
+                #output="$(echo -e "${table}" | column -s '#' -t | awk '/^\+/{gsub(" ", "-", $0)}1')"
+		output="$(echo -e "${table}" | column -s '#' -t | awk '/+/{gsub(" ", "-", $0)}1' | sed 's/^--\|^ //g')"
+                if [[ "${colorHeader}" = 'true' ]]
+                then
+                    echo -e "\033[1;32m$(head -n 3 <<< "${output}")\033[0m"
+                    tail -n +4 <<< "${output}"
+                else
+                    echo "${output}"
+                fi
+            fi
+        fi
+
+        if [[ "${displayTotalCount}" = 'true' && "${numberOfLines}" -ge '0' ]]
+        then
+            echo -e "\n\033[1;36mTOTAL ROWS : $((numberOfLines - 1))\033[0m"
+        fi
+    fi
+}
+
+function removeEmptyLines(){
+    local -r content="${1}"
+
+    echo -e "${content}" | sed '/^\s*$/d'
+}
+
+function repeatString(){
+    local -r string="${1}"
+    local -r numberToRepeat="${2}"
+
+    if [[ "${string}" != '' && "$(isPositiveInteger "${numberToRepeat}")" = 'true' ]]
+    then
+        local -r result="$(printf "%${numberToRepeat}s")"
+        echo -e "${result// /${string}}"
+    fi
+}
+function trimString(){
+    local -r string="${1}"
+
+    sed 's,^[[:blank:]]*,,' <<< "${string}" | sed 's,[[:blank:]]*$,,'
+}
+function isPositiveInteger(){
+    local -r string="${1}"
+    if [[ "${string}" =~ ^[1-9][0-9]*$ ]]
+    then
+        echo 'true' && return 0
+    fi
+    echo 'false' && return 1
+}
+
+#  ----------- . -----------
+
+
+# Global Variables
+
+url="https://gtfobins.github.io/"
+url_functions="https://raw.githubusercontent.com/GTFOBins/GTFOBins.github.io/master/_data/functions.yml"
+url_info_binary="https://raw.githubusercontent.com/GTFOBins/GTFOBins.github.io/master/_gtfobins/"
+
+function getbinary(){
+ 
+	echo " " > bins.tmp
+	while [ "$(cat bins.tmp | wc -l)" == "1" ]; do
+		curl -s "$url_info_binary$1.md" > bins.tmp
+	done
+	
+	output=$(cat bins.tmp | grep -vE "\-\-\-|functions:" | sed -e "s/- code/code/g" -e "s/code: |/code:/g" -e "s/description: |/Description:/g" -e "s/- description/Description/g" -e "s/- Description/Description/")
+	counter=0i
+	while IFS= read -r line; do
+	
+		if [[ $line == *"Description:"* ]]; then
+			echo -en "${turquoiseColor}\n\t"
+			echo $line
+			echo -en "${endColor}"
+			counter=1
+		else
+			if [[ $line == *"code:"* ]]; then
+				if [ "$counter" -eq 1 ]; then
+					echo -en "\t"
+				else
+					echo -en "\n\t"
+				fi
+				counter=0
+				echo $line | sed "s/code:/Code:/"
+			else
+				if [[ $(echo "$line" | grep "^\ .*:$") && $(echo "$line"| wc -w) -eq 1 ]];then	
+
+					line=$(echo $line | tr ":" " "  )
+					echo -e "\n${greenColor} Function: ${endColor}$line" 
+					
+				else
+					echo "   $line"
+				fi
+			fi
+		fi
+	done < <(printf '%s\n' "$output")     
+
+	tput cnorm
+	rm bins.tmp	
+} 
+
+function getListBins(){
+
+	list=$(curl -s "$url" | grep 'bin-name' | grep -o -P '(?<=\>).*?(?=\<)')
+	echo "$list"
+}
+
+function showAllBins(){
+	
+	echo "BINARIES,BINARIES,BINARIES,BINARIES,BINARIES,BINARIES" > bins.tmp
+	while [ "$(cat bins.tmp | wc -l)" == "1" ]; do
+		curl -s "$url" | grep 'bin-name' | grep -o -P '(?<=\>).*?(?=\<)' | sed "s/$/,/" | sed -e "0~6 s/,/ /" | tr -d '\n'| tr ' ' '\n' >> bins.tmp
+	done
+	
+	echo -en "${greenColor}" 
+	printTable ',' "$(cat bins.tmp)"
+	echo -e "${endColor}$line"
+	
+	rm bins.tmp	
+	tput cnorm
+}
+
+function getFunctions(){
+	output=$(curl -s $url_functions | grep -vE "\-\-\-|#" | sed -e "s/description: |/Description:/g" -e "s/label:/Label:/" -e $"s/description:/Description:/")
+	while IFS= read -r line; do
+	
+		if [[ "$line" == *"Description:"* ]]; then
+			line=$(echo "$line" | sed "s/Description://")
+			echo -en "${turquoiseColor}  Description:${endColor}\n"
+			echo " $line"
+		elif [[ $line == *"Label:"* ]]; then
+			echo -e "${purpleColor}"
+			echo "$line"
+			echo -en "${endColor}"
+		else
+			if [[ $( echo "$line" | grep "^[a-z].*:$" ) ]];then	
+				echo -e "\n${greenColor}$line${endColor}" 
+			else
+				echo "$line"
+			fi
+		fi
+	done < <(printf '%s\n' "$output")     
+
+	tput cnorm
+}
+
+function getBinFunc(){
+	echo " " > bins.tmp
+	while [ "$(cat bins.tmp | wc -l)" == "1" ]; do
+		curl -s "$url_info_binary$1.md" > bins.tmp
+	done
+	listFunc=$(curl -s $url_functions |  grep -o "^[a-z].*:$" | tr ":" " ")
+	search=$(echo "$2" | tr '[A-Z]' '[a-z]')
+	if [[ ! $listFunc =~ "$search" ]]; then
+		echo -e "\n${redColor}[!] This function not found on GTFOBins.\n${endColor}"
+		rm bins.tmp; tput cnorm; exit 1
+	fi
+
+	aux=0
+	counter=0
+	output=$(cat bins.tmp | grep -vE "\-\-\-|functions:" | sed -e "s/- code/code/g" -e "s/code: |/code:/g" -e "s/description: |/Description:/g" -e "s/- description/Description/g" -e "s/- Description/Description/")
+	
+	while IFiS= read -r line; do
+		if [[ $(echo "$line" | grep -o "$search") && $aux -eq 0 && $(echo "$line"| wc -w) -eq 1 ]];then	
+			line=$(echo $line | tr ":" " ")
+			echo -e "\n${greenColor} Function: ${endColor}$line" 
+			aux=1
+			continue	
+		fi
+		if [[ $aux -eq 1 ]]; then
+			if [[ $line == *"Description:"* ]]; then
+				echo -en "${turquoiseColor}\n\t"
+				echo $line
+				echo -en "${endColor}"
+				counter=1
+			elif [[ $line == *"code:"* ]]; then
+				if [ "$counter" -eq 1 ]; then
+					echo -en "\t"
+				else
+					echo -en "\n\t"
+				fi
+				echo $line | sed "s/code:/Code:/"
+				counter=0
+			elif [[ $( echo "$line" | grep "^[a-z].*:$" ) ]];then	
+				rm bins.tmp; tput cnorm
+				exit 0 
+			else
+				echo -en "\t    "
+				echo "$line"
+			fi
+		fi
+	done < <(printf '%s\n' "$output")     
+	rm bins.tmp
+	tput cnorm
+}
+
+counter=0
+while getopts ":b:f:ha" arg; do
+	case $arg in
+		b) binary=$OPTARG; let counter+=1;;
+		f) specify_function=$OPTARG; let counter+=1;;
+		a) search_all=$OPTARG;
+    			eval nextopt=\${$OPTIND}
+    			if [[ -n $nextopt && $nextopt != -* ]] ; then
+		  		OPTIND=$((OPTIND + 1))
+      				search_all=$nextopt
+    			else
+      				search_all=1
+    			fi
+    			let counter+=1;;
+		h) HelpPanel;;
+	esac
+done
+
+tput civis
+
+if [[ "$binary" && "$search_all" || "$counter" -eq 0 || "$counter" -eq 3 ]] ; then
+
+	HelpPanel
+else
+	
+	if [ "$binary" ]; then
+		allBins="$(getListBins)"
+		if [[ $allBins =~ "$binary" ]]; then
+			if [ "$specify_function" ]; then
+				getBinFunc "$binary" "$specify_function"
+			else 
+				getbinary "$binary"
+			fi
+		
+		else
+			echo -e "\n${redColor}[!] This binary not found on GTFOBins.\n${endColor}"
+			tput cnorm
+			exit 1
+		fi
+
+	elif [[ "$search_all" == "binaries" || "$search_all" -eq 1 ]]; then
+		showAllBins
+	elif [ "$search_all" == "functions" ]; then
+		getFunctions
+	else
+		HelpPanel
+	fi
+	
+fi
