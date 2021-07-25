@@ -183,7 +183,7 @@ function getbinary(){
 	done
 	
 	output=$(cat bins.tmp | grep -vE "\-\-\-|functions:" | sed -e "s/- code/code/g" -e "s/code: |/code:/g" -e "s/description: |/Description:/g" -e "s/- description/Description/g" -e "s/- Description/Description/")
-	counter=0i
+	counter=0
 	while IFS= read -r line; do
 	
 		if [[ $line == *"Description:"* ]]; then
